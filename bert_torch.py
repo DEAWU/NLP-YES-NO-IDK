@@ -216,10 +216,7 @@ def load_examples(args, tokenizer, split, output_examples = False):
   all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
   all_label_ids = torch.tensor([f.label_id for f in features], dtype=torch.long)
 
-  if split == 'evaluate':
-    dataset = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
-  else:
-    dataset = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
+  dataset = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
 
   if output_examples:
     return dataset, examples, features
@@ -236,21 +233,21 @@ def evaluation(tokenizer, label2ind_dict, valid_or_test="test"):
   test_dataset = load_examples(args, tokenizer, 'evaluate', output_examples=False)
   test_dataloader = DataLoader(test_dataset, shuffle = True, batch_size=args.predict_batch_size)
   loss_func = nn.CrossEntropyLoss()
+  with torch.no_grad():
+    for ind, (token, mask, segment, label) in enumerate(test_dataloader):
+      token = token.cuda()
+      segment = segment.cuda()
+      mask = mask.cuda()
+      label = label.cuda()
 
-  for ind, (token, mask, segment, label) in enumerate(test_dataloader):
-    token = token.cuda()
-    segment = segment.cuda()
-    mask = mask.cuda()
-    label = label.cuda()
+      out = model(token, segment, mask)
+      loss = loss_func(out, label)
+      total_loss += loss.detach().item()
 
-    out = model(token, segment, mask)
-    loss = loss_func(out, label)
-    total_loss += loss.detach().item()
-
-    label = label.data.cpu().numpy()
-    predic = torch.max(out.data, 1)[1].cpu().numpy()
-    labels_all = np.append(labels_all, label)
-    predict_all = np.append(predict_all, predic)
+      label = label.data.cpu().numpy()
+      predic = torch.max(out.data, 1)[1].cpu().numpy()
+      labels_all = np.append(labels_all, label)
+      predict_all = np.append(predict_all, predic)
 
   acc = metrics.accuracy_score(labels_all, predict_all)
   if valid_or_test == "test":
@@ -303,7 +300,7 @@ def train(tokenizer ,label2ind_dict):
     tqdm_bar = tqdm(train_dataloader, desc="Training epoch{epoch}".format(epoch=epoch))
 
     for i, (token, mask, segment, label) in enumerate(tqdm_bar):
-      print(token, segment, mask, label)
+      # print(token, segment, mask, label)
       token = token.cuda()
       segment = segment.cuda()
       mask = mask.cuda()

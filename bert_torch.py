@@ -13,8 +13,7 @@ from sklearn import metrics
 
 from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler, TensorDataset)
 from torch.utils.data.distributed import DistributedSampler
-from transformers import (WEIGHTS_NAME, AdamW, BertConfig, BertModel, BertTokenizer, get_linear_schedule_with_warmup)
-from torch.nn import SyncBatchNorm
+from transformers import (WEIGHTS_NAME, AdamW, BertConfig, BertModel, BertForPreTraining, load_tf_weights_in_bert, BertTokenizer, get_linear_schedule_with_warmup)
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
                     datefmt='%m/%d/%Y %H:%M:%S',
@@ -36,79 +35,65 @@ class InputFeatures(object):
     self.segment_ids = segment_ids
     self.label_id = label_id
 
-class argument(object):
-  def __init__(self):
-    self.model_name_or_path = 'bert-large-cased'
-    self.do_train = True
-    self.do_eval = True
-    self.do_lower_case = True 
-    self.boolq_train_data_path = '/work/scratch/dw27ciju/DATA/BoolQ_3L/train_full.json'
-    self.boolq_dev_data_path = '/work/scratch/dw27ciju/DATA/BoolQ_3L/dev_full.json'
-    self.boolq_test_data_path = '/work/scratch/dw27ciju/DATA/ACE-YNQA/ace_ynqa_full_complete.json'
-    self.max_seq_length = 128
-    self.learning_rate = 1e-6
-    self.num_train_epochs = 3
-    self.logging_steps = 500
-    self.train_batch_size = 24
-    self.eval_batch_size = 8
-    self.predict_batch_size = 8
-    self.output_dir = '/path/to/output-dir'
-    self.config_name = ''
-    self.tokenizer_name = ''
-    self.gradient_accumulation_steps = 1
-    self.weight_decay = 0.0
-    self.adam_epsilon = 1e-6
-    self.max_grad_norm = 5.0
-    self.max_steps = -1
-    self.warmup_proportion = 0.1
-    self.save_steps = 1000
-    self.eval_all_checkpoints = True
-    self.no_cuda = True
-    self.seed = 42
+
+# def convert_tf_checkpoint_to_pytorch(tf_checkpoint_path, bert_config_file, pytorch_dump_path):
+#   # Initialise PyTorch model
+#   config = BertConfig.from_json_file(bert_config_file)
+#   print(f"Building PyTorch model from configuration: {config}")
+#   model = BertForPreTraining(config)
+
+#   # Load weights from tf checkpoint
+#   load_tf_weights_in_bert(model, config, tf_checkpoint_path)
+
+#   # Save pytorch-model
+#   print(f"Save PyTorch model to {pytorch_dump_path}")
+#   torch.save(model.state_dict(), pytorch_dump_path)
+
 
 class MultiClass(nn.Module):
-    """ text processed by bert model encode and get cls vector for classification
-    """
+  """ text processed by bert model encode and get cls vector for classification
+  """
 
-    def __init__(self, model_config, num_classes=3):
+  def __init__(self, model, model_config, num_classes=3):
 
-      super(MultiClass, self).__init__()
-      self.bert = BertModel.from_pretrained('bert-large-cased', config=model_config)
-      self.num_classes = num_classes
-      self.dropout = nn.Dropout(0.1)
-      self.fc = nn.Linear(model_config.hidden_size, num_classes)
+    super(MultiClass, self).__init__()
+    self.bert = model
+    self.num_classes = num_classes
+    self.dropout = nn.Dropout(0.1)
+    self.fc = nn.Linear(model_config.hidden_size, num_classes)
 
-    def forward(self, batch_token, batch_segment, batch_attention_mask):
+  def forward(self, batch_token, batch_segment, batch_attention_mask):
 
-      out = self.bert(batch_token, attention_mask=batch_attention_mask,
-                      token_type_ids=batch_segment,
-                      output_hidden_states=False)
-      
-      pooled = out.pooler_output  # [batch, 768]
-      out_fc = self.dropout(pooled)
-      out_fc = self.fc(out_fc)
+    out = self.bert(batch_token, attention_mask=batch_attention_mask,
+                    token_type_ids=batch_segment,
+                    output_hidden_states=False)
+    
+    pooled = out.pooler_output  # [batch, 768]
+    out_fc = self.dropout(pooled)
+    out_fc = self.fc(out_fc)
 
-      return out_fc
+    return out_fc
 
 def _create_examples(filename, set_type):
   """Creates examples for the training and dev sets."""
+
   examples = []
   with open(filename, encoding='utf-8') as f:
     for i, line in enumerate(f):
       data = json.loads(line)
       guid = "%s-%s" % (set_type, i)
       if data["answer"]==True:
-          label = "Yes"
+        label = "Yes"
       elif data["answer"]==False:
-          label = "No"
+        label = "No"
       else:
-          label = data["answer"]
+        label = data["answer"]
       examples.append(
-          BoolQExample(
-              guid=guid,
-              text_a=data["passage"],
-              text_b=data["question"],
-              label=label))
+        BoolQExample(
+          guid=guid,
+          text_a=data["passage"],
+          text_b=data["question"],
+          label=label))
 
   return examples
 
@@ -124,15 +109,15 @@ def convert_examples_to_features(examples, max_seq_length, tokenizer):
 
     tokens_b = None
     if example.text_b:
-        tokens_b = tokenizer.tokenize(example.text_b)
-        # Modifies `tokens_a` and `tokens_b` in place so that the total
-        # length is less than the specified length.
-        # Account for [CLS], [SEP], [SEP] with "- 3"
-        _truncate_seq_pair(tokens_a, tokens_b, max_seq_length - 3)
+      tokens_b = tokenizer.tokenize(example.text_b)
+      # Modifies `tokens_a` and `tokens_b` in place so that the total
+      # length is less than the specified length.
+      # Account for [CLS], [SEP], [SEP] with "- 3"
+      _truncate_seq_pair(tokens_a, tokens_b, max_seq_length - 3)
     else:
-        # Account for [CLS] and [SEP] with "- 2"
-        if len(tokens_a) > max_seq_length - 2:
-            tokens_a = tokens_a[:(max_seq_length - 2)]
+      # Account for [CLS] and [SEP] with "- 2"
+      if len(tokens_a) > max_seq_length - 2:
+        tokens_a = tokens_a[:(max_seq_length - 2)]
 
     # The convention in BERT is:
     # (a) For sequence pairs:
@@ -156,8 +141,8 @@ def convert_examples_to_features(examples, max_seq_length, tokenizer):
     segment_ids = [0] * len(tokens)
 
     if tokens_b:
-        tokens += tokens_b + ["[SEP]"]
-        segment_ids += [1] * (len(tokens_b) + 1)
+      tokens += tokens_b + ["[SEP]"]
+      segment_ids += [1] * (len(tokens_b) + 1)
 
     input_ids = tokenizer.convert_tokens_to_ids(tokens)
 
@@ -241,117 +226,138 @@ def load_examples(args, tokenizer, split, output_examples = False):
   return dataset
 
 
-def evaluation(model, test_dataloader, loss_func, label2ind_dict, valid_or_test="test"):
-    # model.load_state_dict(torch.load(save_path))
+def evaluation(tokenizer, label2ind_dict, valid_or_test="test"):
+  args = argument()
+  model = torch.load(args.save_path)
+  model.eval()
+  total_loss = 0
+  predict_all = np.array([], dtype=int)
+  labels_all = np.array([], dtype=int)
+  test_dataset = load_examples(args, tokenizer, 'evaluate', output_examples=False)
+  test_dataloader = DataLoader(test_dataset, shuffle = True, batch_size=args.predict_batch_size)
+  loss_func = nn.CrossEntropyLoss()
 
-    model.eval()
-    total_loss = 0
+  for ind, (token, mask, segment, label) in enumerate(test_dataloader):
+    token = token.cuda()
+    segment = segment.cuda()
+    mask = mask.cuda()
+    label = label.cuda()
+
+    out = model(token, segment, mask)
+    loss = loss_func(out, label)
+    total_loss += loss.detach().item()
+
+    label = label.data.cpu().numpy()
+    predic = torch.max(out.data, 1)[1].cpu().numpy()
+    labels_all = np.append(labels_all, label)
+    predict_all = np.append(predict_all, predic)
+
+  acc = metrics.accuracy_score(labels_all, predict_all)
+  if valid_or_test == "test":
+    report = metrics.classification_report(labels_all, predict_all, target_names=label2ind_dict.keys(), digits=4)
+    confusion = metrics.confusion_matrix(labels_all, predict_all)
+    print('EVAL')
+    print("Accuracy: %.4f Loss in test %.4f" % (acc, loss))
+    print(report, '\n', confusion)
+
+def train(tokenizer ,label2ind_dict):
+    
+  args = argument()
+  # convert_tf_checkpoint_to_pytorch(args.checkpoint_path, args.config_file, args.pytorch_dump_path)
+  
+  os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+  torch.backends.cudnn.benchmark = True
+
+  train_dataset = load_examples(args, tokenizer, 'train', output_examples=False)
+  train_dataloader = DataLoader(train_dataset, shuffle = False, batch_size=args.train_batch_size)
+  print("len(train_dataset): ",len(train_dataset))
+  
+  model_config = BertConfig.from_pretrained(args.config_file)
+  model = BertModel.from_pretrained(args.pytorch_dump_path, config = model_config)
+  multi_classification_model = MultiClass(model, model_config, num_classes = 3)
+  multi_classification_model.cuda()
+  # multi_classification_model.load_state_dict(torch.load(config.save_path))
+
+  num_train_optimization_steps = len(train_dataloader) * args.num_train_epochs
+  param_optimizer = list(multi_classification_model.named_parameters())
+  no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+  optimizer_grouped_parameters = [
+      {'params': [p for n, p in param_optimizer
+                  if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+      {'params': [p for n, p in param_optimizer
+                  if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+  ]
+  optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, correct_bias= True)
+  scheduler = get_linear_schedule_with_warmup(optimizer, 500, num_train_optimization_steps)
+
+  loss_func = nn.CrossEntropyLoss()
+
+  loss_total = []
+  multi_classification_model.train()
+
+  for epoch in range(args.num_train_epochs):
     predict_all = np.array([], dtype=int)
     labels_all = np.array([], dtype=int)
 
-    for ind, (token, mask, segment, label) in enumerate(test_dataloader):
-        token = token.cuda()
-        segment = segment.cuda()
-        mask = mask.cuda()
-        label = label.cuda()
+    start_time = time.time()
+    tqdm_bar = tqdm(train_dataloader, desc="Training epoch{epoch}".format(epoch=epoch))
 
-        out = model(token, segment, mask)
-        loss = loss_func(out, label)
-        total_loss += loss.detach().item()
+    for i, (token, mask, segment, label) in enumerate(tqdm_bar):
+      print(token, segment, mask, label)
+      token = token.cuda()
+      segment = segment.cuda()
+      mask = mask.cuda()
+      label = label.cuda()
 
-        label = label.data.cpu().numpy()
-        predic = torch.max(out.data, 1)[1].cpu().numpy()
-        labels_all = np.append(labels_all, label)
-        predict_all = np.append(predict_all, predic)
+      optimizer.zero_grad()
 
-    acc = metrics.accuracy_score(labels_all, predict_all)
-    if valid_or_test == "test":
-        report = metrics.classification_report(labels_all, predict_all, target_names=label2ind_dict.keys(), digits=4)
-        confusion = metrics.confusion_matrix(labels_all, predict_all)
-        F1_avg = metrics.precision_score(labels_all, predict_all, average='micro')
-        return acc, total_loss / len(test_dataloader), report, confusion, F1_avg
-    return acc, total_loss / len(test_dataloader)
-
-def train():
-    label2ind_dict = {'Yes': 0, 'No': 1, 'no-answer': 2}
-    args = argument()
-    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
-    torch.backends.cudnn.benchmark = True
-
-    # load_data(os.path.join(data_dir, "cnews.train.txt"), label_dict)
-
-    tokenizer = BertTokenizer.from_pretrained('bert-large-cased')
-    train_dataset = load_examples(args, tokenizer, 'train', output_examples=False) 
-    train_dataloader = DataLoader(train_dataset, shuffle = True, batch_size=args.train_batch_size)
-    print("len(train_dataset): ",len(train_dataset))
+      out = multi_classification_model(token, segment, mask)
+      # print(out, label)
+      loss = loss_func(out, label)
+      loss.backward()
+      optimizer.step()
+      scheduler.step()
+      # optimizer.zero_grad()
+      loss_total.append(loss.detach().item())
+      label = label.data.cpu().numpy()
+      predic = torch.max(out.data, 1)[1].cpu().numpy()
+      labels_all = np.append(labels_all, label)
+      predict_all = np.append(predict_all, predic)
     
 
-    test_dataset = load_examples(args, tokenizer, 'evaluate', output_examples=False)
-    test_dataloader = DataLoader(test_dataset, shuffle = False, batch_size=args.predict_batch_size)
-    
+    acc_train = metrics.accuracy_score(labels_all, predict_all)
+    report_train = metrics.classification_report(labels_all, predict_all, target_names=label2ind_dict.keys(), digits=4)
+    confusion_train = metrics.confusion_matrix(labels_all, predict_all)
+    F1_avg = metrics.precision_score(labels_all, predict_all, average='micro')
+    print(F1_avg)
+    print("Epoch: %03d; loss = %.4f cost time  %.4f" % (epoch, np.mean(loss_total), time.time() - start_time))
+    print(acc_train)
+    print(report_train, '\n', confusion_train)
 
-    model_config = BertConfig.from_pretrained('bert-large-cased')
-    multi_classification_model = MultiClass(model_config, num_classes = 3)
-    multi_classification_model.cuda()
-    # multi_classification_model.load_state_dict(torch.load(config.save_path))
+    time.sleep(1)
+  torch.save(multi_classification_model, args.save_path)
 
-    num_train_optimization_steps = len(train_dataloader) * args.num_train_epochs
-    param_optimizer = list(multi_classification_model.named_parameters())
-    no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
-    optimizer_grouped_parameters = [
-        {'params': [p for n, p in param_optimizer
-                    if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-        {'params': [p for n, p in param_optimizer
-                    if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-    ]
-    optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, correct_bias= True)
-    scheduler = get_linear_schedule_with_warmup(optimizer, int(num_train_optimization_steps * args.warmup_proportion), num_train_optimization_steps)
-    loss_func = nn.CrossEntropyLoss()
+if __name__ == "__main__":
+  parser = argparse.ArgumentParser()
+  parser.add_argument("--boolq_train_data_path", default = '', type = str)
+  parser.add_argument("--boolq_dev_data_path", default = '', type = str)
+  parser.add_argument("--boolq_test_data_path", default = '', type = str)
+  parser.add_argument("--max_seq_length", default = 128, type = int)
+  parser.add_argument("--learning_rate", default = 1e-6, type = float)
+  parser.add_argument("--num_train_epochs", default = 4, type = int)
+  parser.add_argument("--train_batch_size", default = 24, type = int)
+  parser.add_argument("--eval_batch_size", default = 8, type = int)
+  parser.add_argument("--predict_batch_size", default = 8, type = int)
+  # parser.add_argument("--checkpoint_path", default = '', type = str)
+  parser.add_argument("--config_file", default = '', type = str)
+  parser.add_argument("--pytorch_dump_path", default = '', type = str)
+  parser.add_argument("--save_path", default = '', type = str)
+  parser.add_argument("--tokenizer_path", default = '', type = str)
 
-    loss_total, top_acc = [], 0
+  args = parser.parse_args()
 
-    for epoch in range(num_train_epochs):
-        predict_all = np.array([], dtype=int)
-        labels_all = np.array([], dtype=int)
+  tokenizer = BertTokenizer.from_pretrained(args.tokenizer_path)
+  label2ind_dict = {'Yes': 0, 'No': 1, "no-answer": 2}
 
-        multi_classification_model.train()
-        start_time = time.time()
-        tqdm_bar = tqdm(train_dataloader, desc="Training epoch{epoch}".format(epoch=epoch))
-
-        for i, (token, mask, segment, label) in enumerate(tqdm_bar):
-            # print(token, segment, mask, label)
-            token = token.cuda()
-            segment = segment.cuda()
-            mask = mask.cuda()
-            label = label.cuda()
-
-            multi_classification_model.zero_grad()
-            out = multi_classification_model(token, segment, mask)
-            # print(out, label)
-            loss = loss_func(out, label)
-            loss.backward()
-            optimizer.step()
-            scheduler.step()
-            optimizer.zero_grad()
-            loss_total.append(loss.detach().item())
-            label = label.data.cpu().numpy()
-            predic = torch.max(out.data, 1)[1].cpu().numpy()
-            labels_all = np.append(labels_all, label)
-            predict_all = np.append(predict_all, predic)
-
-        acc_train = metrics.accuracy_score(labels_all, predict_all)
-        # report_train = metrics.classification_report(labels_all, predict_all, target_names=label2ind_dict.keys(), digits=4)
-        # confusion_train = metrics.confusion_matrix(labels_all, predict_all)
-        print("Epoch: %03d; loss = %.4f cost time  %.4f" % (epoch, np.mean(loss_total), time.time() - start_time))
-        print(acc_train)
-        # print(report_train, '\n', confusion_train)
-        acc, loss, report, confusion, F1_avg = evaluation(multi_classification_model, test_dataloader, loss_func, label2ind_dict)
-        print("Accuracy: %.4f Loss in test %.4f" % (acc, loss))
-        if top_acc < acc:
-            top_acc = acc
-            # torch.save(multi_classification_model.state_dict(), config.save_path)
-            print(report, '\n', confusion, F1_avg)
-
-        time.sleep(1)
-
-train()
+  train(tokenizer ,label2ind_dict)
+  evaluation(tokenizer, label2ind_dict, valid_or_test="test")

@@ -20,5 +20,100 @@ The **pytorch_dump_path** is used to store bin file transformed from ckpt file.
               --save_path $BERT_MODEL/Test_train.pkl\
               --tokenizer_path $BERT_MODEL/
               
-              
+## Results shown by the run
+len(train_dataset):  14141
+Some weights of the model checkpoint at /content/drive/MyDrive/BERT_QA/model/BERT_MODEL/pytorch_model.bin were not used when initializing BertModel: ['cls.predictions.transform.dense.weight', 'cls.predictions.bias', 'cls.predictions.transform.LayerNorm.bias', 'cls.predictions.transform.dense.bias', 'cls.predictions.decoder.bias', 'cls.seq_relationship.weight', 'cls.predictions.decoder.weight', 'cls.seq_relationship.bias', 'cls.predictions.transform.LayerNorm.weight']
+- This IS expected if you are initializing BertModel from the checkpoint of a model trained on another task or with another architecture (e.g. initializing a BertForSequenceClassification model from a BertForPreTraining model).
+- This IS NOT expected if you are initializing BertModel from the checkpoint of a model that you expect to be exactly identical (initializing a BertForSequenceClassification model from a BertForSequenceClassification model).
+/usr/local/lib/python3.7/dist-packages/transformers/optimization.py:310: FutureWarning: This implementation of AdamW is deprecated and will be removed in a future version. Use the PyTorch implementation torch.optim.AdamW instead, or set `no_deprecation_warning=True` to disable this warning
+  FutureWarning,
+Training epoch0: 100%|██████████| 590/590 [17:11<00:00,  1.75s/it]
+0.5154515239374867
+Epoch: 000; loss = 1.0822 cost time  1031.2603
+0.5154515239374867
+              precision    recall  f1-score   support
+
+         Yes     0.5043    0.8825    0.6418      5874
+          No     0.0062    0.0011    0.0019      3553
+   no-answer     0.6529    0.4457    0.5298      4714
+
+    accuracy                         0.5155     14141
+   macro avg     0.3878    0.4431    0.3912     14141
+weighted avg     0.4287    0.5155    0.4437     14141
+ 
+ [[5184    4  686]
+ [3118    4  431]
+ [1978  635 2101]]
+Training epoch1: 100%|██████████| 590/590 [17:22<00:00,  1.77s/it]
+0.6508733470051623
+Epoch: 001; loss = 0.7667 cost time  1042.6599
+0.6508733470051623
+              precision    recall  f1-score   support
+
+         Yes     0.5714    0.8951    0.6975      5874
+          No     0.3247    0.0141    0.0270      3553
+   no-answer     0.8142    0.8265    0.8203      4714
+
+    accuracy                         0.6509     14141
+   macro avg     0.5701    0.5786    0.5149     14141
+weighted avg     0.5904    0.6509    0.5700     14141
+ 
+ [[5258   83  533]
+ [3147   50  356]
+ [ 797   21 3896]]
+Training epoch2: 100%|██████████| 590/590 [17:21<00:00,  1.77s/it]
+0.6669259599745421
+Epoch: 002; loss = 0.7071 cost time  1041.9952
+0.6669259599745421
+              precision    recall  f1-score   support
+
+         Yes     0.5793    0.9198    0.7109      5874
+          No     0.2718    0.0079    0.0153      3553
+   no-answer     0.8489    0.8485    0.8487      4714
+
+    accuracy                         0.6669     14141
+   macro avg     0.5667    0.5921    0.5250     14141
+weighted avg     0.5919    0.6669    0.5821     14141
+ 
+ [[5403   54  417]
+ [3230   28  295]
+ [ 693   21 4000]]
+Training epoch3: 100%|██████████| 590/590 [17:22<00:00,  1.77s/it]
+0.6693303161021145
+Epoch: 003; loss = 0.6979 cost time  1042.4036
+0.6693303161021145
+              precision    recall  f1-score   support
+
+         Yes     0.5786    0.9229    0.7113      5874
+          No     0.3913    0.0127    0.0245      3553
+   no-answer     0.8587    0.8483    0.8535      4714
+
+    accuracy                         0.6693     14141
+   macro avg     0.6095    0.5946    0.5298     14141
+weighted avg     0.6249    0.6693    0.5861     14141
+ 
+ [[5421   61  392]
+ [3242   45  266]
+ [ 706    9 3999]]
+EVAL
+Accuracy: 0.6779 Loss in test 1.1083
+              precision    recall  f1-score   support
+
+         Yes     0.5818    0.9449    0.7201      2033
+          No     0.0000    0.0000    0.0000      1237
+   no-answer     0.8759    0.8588    0.8673      1636
+
+    accuracy                         0.6779      4906
+   macro avg     0.4859    0.6012    0.5291      4906
+weighted avg     0.5332    0.6779    0.5876      4906
+ 
+ [[1921    0  112]
+ [1150    0   87]
+ [ 231    0 1405]]
+/usr/local/lib/python3.7/dist-packages/sklearn/metrics/_classification.py:1318: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+/usr/local/lib/python3.7/dist-packages/sklearn/metrics/_classification.py:1318: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+/usr/local/lib/python3.7/dist-packages/sklearn/metrics/_classification.py:1318: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
               

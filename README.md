@@ -27,7 +27,7 @@ Training epoch0: 100%|██████████| 590/590 [17:11<00:00,  1.7
 0.5154515239374867     
 Epoch: 000; loss = 1.0822 cost time  1031.2603      
 0.5154515239374867       
-                       precision    recall  f1-score   support
+                      precision    recall  f1-score   support
   
                  Yes     0.5043    0.8825    0.6418      5874
                   No     0.0062    0.0011    0.0019      3553

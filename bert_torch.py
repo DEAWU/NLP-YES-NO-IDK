@@ -36,18 +36,18 @@ class InputFeatures(object):
     self.label_id = label_id
 
 
-# def convert_tf_checkpoint_to_pytorch(tf_checkpoint_path, bert_config_file, pytorch_dump_path):
-#   # Initialise PyTorch model
-#   config = BertConfig.from_json_file(bert_config_file)
-#   print(f"Building PyTorch model from configuration: {config}")
-#   model = BertForPreTraining(config)
+def convert_tf_checkpoint_to_pytorch(tf_checkpoint_path, bert_config_file, pytorch_dump_path):
+  # Initialise PyTorch model
+  config = BertConfig.from_json_file(bert_config_file)
+  print(f"Building PyTorch model from configuration: {config}")
+  model = BertForPreTraining(config)
 
-#   # Load weights from tf checkpoint
-#   load_tf_weights_in_bert(model, config, tf_checkpoint_path)
+  # Load weights from tf checkpoint
+  load_tf_weights_in_bert(model, config, tf_checkpoint_path)
 
-#   # Save pytorch-model
-#   print(f"Save PyTorch model to {pytorch_dump_path}")
-#   torch.save(model.state_dict(), pytorch_dump_path)
+  # Save pytorch-model
+  print(f"Save PyTorch model to {pytorch_dump_path}")
+  torch.save(model.state_dict(), pytorch_dump_path)
 
 
 class MultiClass(nn.Module):
@@ -195,7 +195,7 @@ def _truncate_seq_pair(tokens_a, tokens_b, max_length):
     else:
       tokens_b.pop()
 
-def load_examples(args, tokenizer, split, output_examples = False):
+def load_examples(tokenizer, split, output_examples = False):
 
   if split == 'train':
     input_file = args.boolq_train_data_path
@@ -224,13 +224,13 @@ def load_examples(args, tokenizer, split, output_examples = False):
 
 
 def evaluation(tokenizer, label2ind_dict, valid_or_test="test"):
-  args = argument()
+
   model = torch.load(args.save_path)
   model.eval()
   total_loss = 0
   predict_all = np.array([], dtype=int)
   labels_all = np.array([], dtype=int)
-  test_dataset = load_examples(args, tokenizer, 'evaluate', output_examples=False)
+  test_dataset = load_examples(tokenizer, 'evaluate', output_examples=False)
   test_dataloader = DataLoader(test_dataset, shuffle = True, batch_size=args.predict_batch_size)
   loss_func = nn.CrossEntropyLoss()
   with torch.no_grad():
@@ -259,13 +259,10 @@ def evaluation(tokenizer, label2ind_dict, valid_or_test="test"):
 
 def train(tokenizer ,label2ind_dict):
     
-  args = argument()
-  # convert_tf_checkpoint_to_pytorch(args.checkpoint_path, args.config_file, args.pytorch_dump_path)
-  
   os.environ["CUDA_VISIBLE_DEVICES"] = '0'
   torch.backends.cudnn.benchmark = True
 
-  train_dataset = load_examples(args, tokenizer, 'train', output_examples=False)
+  train_dataset = load_examples(tokenizer, 'train', output_examples=False)
   train_dataloader = DataLoader(train_dataset, shuffle = False, batch_size=args.train_batch_size)
   print("len(train_dataset): ",len(train_dataset))
   
@@ -273,7 +270,6 @@ def train(tokenizer ,label2ind_dict):
   model = BertModel.from_pretrained(args.pytorch_dump_path, config = model_config)
   multi_classification_model = MultiClass(model, model_config, num_classes = 3)
   multi_classification_model.cuda()
-  # multi_classification_model.load_state_dict(torch.load(config.save_path))
 
   num_train_optimization_steps = len(train_dataloader) * args.num_train_epochs
   param_optimizer = list(multi_classification_model.named_parameters())
@@ -289,18 +285,16 @@ def train(tokenizer ,label2ind_dict):
 
   loss_func = nn.CrossEntropyLoss()
 
-  loss_total = []
-  multi_classification_model.train()
-
   for epoch in range(args.num_train_epochs):
     predict_all = np.array([], dtype=int)
     labels_all = np.array([], dtype=int)
-
+    loss_total = []
+    multi_classification_model.train()
     start_time = time.time()
     tqdm_bar = tqdm(train_dataloader, desc="Training epoch{epoch}".format(epoch=epoch))
 
     for i, (token, mask, segment, label) in enumerate(tqdm_bar):
-      # print(token, segment, mask, label)
+      # print(token, mask, segment, label)
       token = token.cuda()
       segment = segment.cuda()
       mask = mask.cuda()
@@ -345,14 +339,15 @@ if __name__ == "__main__":
   parser.add_argument("--train_batch_size", default = 24, type = int)
   parser.add_argument("--eval_batch_size", default = 8, type = int)
   parser.add_argument("--predict_batch_size", default = 8, type = int)
-  # parser.add_argument("--checkpoint_path", default = '', type = str)
+  parser.add_argument("--checkpoint_path", default = '', type = str)
   parser.add_argument("--config_file", default = '', type = str)
   parser.add_argument("--pytorch_dump_path", default = '', type = str)
   parser.add_argument("--save_path", default = '', type = str)
   parser.add_argument("--tokenizer_path", default = '', type = str)
 
   args = parser.parse_args()
-
+  
+  convert_tf_checkpoint_to_pytorch(args.checkpoint_path, args.config_file, args.pytorch_dump_path)
   tokenizer = BertTokenizer.from_pretrained(args.tokenizer_path)
   label2ind_dict = {'Yes': 0, 'No': 1, "no-answer": 2}
 

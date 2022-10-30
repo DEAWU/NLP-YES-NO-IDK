@@ -21,16 +21,16 @@ The **pytorch_dump_path** is used to store bin file transformed from ckpt file.
               --tokenizer_path $BERT_MODEL/
               
 ## Results shown by the run
-len(train_dataset):  14141
+len(train_dataset):  14141       
 Some weights of the model checkpoint at /content/drive/MyDrive/BERT_QA/model/BERT_MODEL/pytorch_model.bin were not used when initializing BertModel: ['cls.predictions.transform.dense.weight', 'cls.predictions.bias', 'cls.predictions.transform.LayerNorm.bias', 'cls.predictions.transform.dense.bias', 'cls.predictions.decoder.bias', 'cls.seq_relationship.weight', 'cls.predictions.decoder.weight', 'cls.seq_relationship.bias', 'cls.predictions.transform.LayerNorm.weight']
 - This IS expected if you are initializing BertModel from the checkpoint of a model trained on another task or with another architecture (e.g. initializing a BertForSequenceClassification model from a BertForPreTraining model).
 - This IS NOT expected if you are initializing BertModel from the checkpoint of a model that you expect to be exactly identical (initializing a BertForSequenceClassification model from a BertForSequenceClassification model).
 /usr/local/lib/python3.7/dist-packages/transformers/optimization.py:310: FutureWarning: This implementation of AdamW is deprecated and will be removed in a future version. Use the PyTorch implementation torch.optim.AdamW instead, or set `no_deprecation_warning=True` to disable this warning
-  FutureWarning,
+  FutureWarning,        
 Training epoch0: 100%|██████████| 590/590 [17:11<00:00,  1.75s/it]
-0.5154515239374867
-Epoch: 000; loss = 1.0822 cost time  1031.2603
-0.5154515239374867
+0.5154515239374867     
+Epoch: 000; loss = 1.0822 cost time  1031.2603      
+0.5154515239374867       
               precision    recall  f1-score   support
 
          Yes     0.5043    0.8825    0.6418      5874
@@ -39,7 +39,7 @@ Epoch: 000; loss = 1.0822 cost time  1031.2603
 
     accuracy                         0.5155     14141
    macro avg     0.3878    0.4431    0.3912     14141
-weighted avg     0.4287    0.5155    0.4437     14141
+weighted avg     0.4287    0.5155    0.4437     14141      
  
  [[5184    4  686]
  [3118    4  431]

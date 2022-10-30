@@ -20,9 +20,9 @@ The **pytorch_dump_path** is used to store bin file transformed from ckpt file.
               --save_path $BERT_MODEL/Test_train.pkl\
               --tokenizer_path $BERT_MODEL/
               
-## Results shown by the run
+## Results
 len(train_dataset):  14141       
-      
+### Training      
 Training epoch0: 100%|██████████| 590/590 [17:11<00:00,  1.75s/it]
 0.5154515239374867     
 Epoch: 000; loss = 1.0822 cost time  1031.2603      
@@ -91,7 +91,7 @@ Training epoch3: 100%|██████████| 590/590 [17:22<00:00,  1.7
          [[5421   61  392]
          [3242   45  266]
          [ 706    9 3999]]                   
-EVAL
+### Evaluation
         Accuracy: 0.6779 Loss in test 1.1083
                       precision    recall  f1-score   support
 

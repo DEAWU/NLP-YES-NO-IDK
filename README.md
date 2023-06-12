@@ -27,9 +27,22 @@ python  -m autoprompt.create_trigger  --train SICK_TRAIN_ALL_S.tsv --dev SICK_DE
 ```
 python -m autoprompt.label_search --train ../data/SICK-E-balanced/3-balance/SICK_TRAIN_ALL_S.tsv --template '[CLS] {sentence_A} [P] [T] [T] [T] {sentence_B} [SEP]' --label-map '{"ENTAILMENT": 0, "CONTRADICTION": 1, "NEUTRAL": 2}' --iters 50 --model-name bert_base
 ```
-## Code for prompt-based Fine-tyning:
--       run prompt_based_fine_tuning.py
-              
+## Code for prompt-based Fine-tuning:
+<!-- ### Generation of Templates:
+~~~
+python -m prompt_fine_tuning.create_template
+~~~
+### Label Token Selection:
+Similar to the process of automatic template search, we generate candidate label word mappings by running:
+~~~
+python -m prompt_fine_tuning.label_search
+~~~ -->
+### Run Fine-tuning Model:
+To carry out experiments with multiple data splits, you can use the following codes:
+~~~
+python -m prompt_fine_tuning.prompt_based_fine_tuning
+~~~
+With the change of split data seed, we can get a more accurate results by caculating the average precision from each split dataset.
 ## Bibliography
 ```
 @inproceedings{autoprompt:emnlp20,
